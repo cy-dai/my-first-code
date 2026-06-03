@@ -1,0 +1,87 @@
+import yfinance as yf
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# 股票代號
+stock_id = input("請輸入股票代號：")
+
+# 抓資料
+data = yf.download(stock_id, period="2y", progress=False)
+
+# 防呆：避免抓不到資料
+if data.empty:
+    print("❌ 沒有抓到資料，請檢查股票代號")
+    exit()
+
+# 計算均線
+data["MA20"] = data["Close"].rolling(20).mean()
+data["MA60"] = data["Close"].rolling(60).mean()
+data["MA120"] = data["Close"].rolling(120).mean()
+
+# 去掉空值
+data = data.dropna()
+
+# 建立買賣訊號
+data["Signal"] = 0
+data.loc[data["MA20"] > data["MA60"], "Signal"] = 1
+data["Position"] = data["Signal"].diff()
+
+# 畫圖
+plt.figure(figsize=(12,6))
+
+# 股價 + 均線
+plt.plot(data["Close"], label="Close Price")
+plt.plot(data["MA20"], label="MA20")
+plt.plot(data["MA60"], label="MA60")
+plt.plot(data["MA120"], label="MA120")
+
+# 買點（黃金交叉）
+buy = data[data["Position"] == 1]
+
+plt.scatter(buy.index, buy["Close"],
+            marker="^", color="green", label="Buy")
+
+# 賣點（死亡交叉）
+sell = data[data["Position"] == -1]
+
+plt.scatter(sell.index, sell["Close"],
+            marker="v", color="red", label="Sell")
+
+# 最新均線
+ma20 = data["MA20"].iloc[-1]
+ma60 = data["MA60"].iloc[-1]
+ma120 = data["MA120"].iloc[-1]
+
+# 判斷趨勢
+if ma20 > ma60 > ma120:
+    trend = "上升"
+    advice = "適合長期持有"
+elif ma20 < ma60 < ma120:
+    trend = "下降"
+    advice = "不建議投資"
+else:
+    trend = "盤整"
+    advice = "建議觀望"
+
+# 一句話分析
+summary = f"{stock_id} 目前趨勢為 {trend}，建議：{advice}"
+
+# 輸出結果
+print("========== 分析結果 ==========")
+print("股票代號：", stock_id)
+print("MA20： ", round(ma20, 2))
+print("MA60： ", round(ma60, 2))
+print("MA120： ", round(ma120, 2))
+print("趨勢： ", trend)
+print("投資建議： ", advice)
+print("AI摘要： ", summary)
+
+# 圖表設定
+plt.title(f"{stock_id} Stock Analysis")
+plt.xlabel("Date")
+plt.ylabel("Price")
+plt.legend()
+
+# 存圖 + 顯示
+plt.savefig("stock_chart.png")
+plt.show()
